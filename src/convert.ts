@@ -1,469 +1,516 @@
-import { booleanLiteral, File, Flow, FlowBaseAnnotation, FunctionTypeAnnotation, Identifier, identifier, isTSTypeParameter, isTypeParameter, LVal, Node, numericLiteral, stringLiteral, tsAnyKeyword, tsArrayType, tsAsExpression, tsBooleanKeyword, tsFunctionType, TSFunctionType, tsIntersectionType, tsLiteralType, tsNullKeyword, tsNumberKeyword, tsPropertySignature, tsStringKeyword, tsThisType, tsTupleType, TSType, tsTypeAnnotation, tsTypeLiteral, tsTypeParameter, tsTypeParameterDeclaration, tsTypeQuery, tsTypeReference, tsUndefinedKeyword, tsUnionType, tsVoidKeyword, TypeAnnotation, TypeParameter, VariableDeclarator } from '@babel/types'
-import * as t from '@babel/types'
-import { generateFreeIdentifier } from './utils'
+import * as t from '@babel/types';
+import { generateFreeIdentifier } from './utils';
 
-export function convert(f: File): File {
-  return ts(f)
+export function convert(f: t.File): t.File {
+  const result = ts(f);
+  return result;
 }
 
-type AnyNode = AnyNonFlowNode | Flow
-type AnyNonFlowNode = LVal | t.Statement | t.Declaration | TSType | VariableDeclarator
-  | t.Expression | t.Literal | t.ModuleSpecifier | t.JSX
-  | t.File | t.Program | null | undefined | t.Property
-
-type TS = {
-
-  // LVals
-  (node: t.Identifier): t.Identifier
-  (node: t.MemberExpression): t.MemberExpression
-  (node: t.RestElement): t.RestElement
-  (node: t.AssignmentPattern): t.AssignmentPattern
-  (node: t.ArrayPattern): t.ArrayPattern
-  (node: t.ObjectPattern): t.ObjectPattern
-  (node: t.TSParameterProperty): t.TSParameterProperty
-  (node: t.LVal): t.LVal
-  (node: t.VariableDeclaration): t.VariableDeclaration
-
-  // ModuleSpecifiers
-  (node: t.ExportSpecifier): t.ExportSpecifier
-  (node: t.ImportDefaultSpecifier): t.ImportDefaultSpecifier
-  (node: t.ImportNamespaceSpecifier): t.ImportNamespaceSpecifier
-  (node: t.ImportSpecifier): t.ImportSpecifier
-  (node: t.ExportDefaultSpecifier): t.ExportDefaultSpecifier
-  (node: t.ExportNamespaceSpecifier): t.ExportNamespaceSpecifier
-  (node: t.ModuleSpecifier): t.ModuleSpecifier
-
-  // Statements
-  (node: t.BlockStatement): t.BlockStatement
-  (node: t.BreakStatement): t.BreakStatement
-  (node: t.ContinueStatement): t.ContinueStatement
-  (node: t.DebuggerStatement): t.DebuggerStatement
-  (node: t.DoWhileStatement): t.DoWhileStatement
-  (node: t.EmptyStatement): t.EmptyStatement
-  (node: t.ExpressionStatement): t.ExpressionStatement
-  (node: t.ForInStatement): t.ForInStatement
-  (node: t.ForStatement): t.ForStatement
-  (node: t.FunctionDeclaration): t.FunctionDeclaration
-  (node: t.IfStatement): t.IfStatement
-  (node: t.LabeledStatement): t.LabeledStatement
-  (node: t.ReturnStatement): t.ReturnStatement
-  (node: t.SwitchStatement): t.SwitchStatement
-  (node: t.ThrowStatement): t.ThrowStatement
-  (node: t.TryStatement): t.TryStatement
-  (node: t.WhileStatement): t.WhileStatement
-  (node: t.WithStatement): t.WithStatement
-  (node: t.ClassDeclaration): t.ClassDeclaration
-  (node: t.ExportAllDeclaration): t.ExportAllDeclaration
-  (node: t.ExportDefaultDeclaration): t.ExportDefaultDeclaration
-  (node: t.ExportNamedDeclaration): t.ExportNamedDeclaration
-  (node: t.ForOfStatement): t.ForOfStatement
-  (node: t.ImportDeclaration): t.ImportDeclaration
-  (node: t.Statement): t.Statement
-
-  // Statements (TS)
-  (node: t.TSDeclareFunction): t.TSDeclareFunction
-  (node: t.TSEnumDeclaration): t.TSEnumDeclaration
-  (node: t.TSExportAssignment): t.TSExportAssignment
-  (node: t.TSImportEqualsDeclaration): t.TSImportEqualsDeclaration
-  (node: t.TSInterfaceDeclaration): t.TSInterfaceDeclaration
-  (node: t.TSModuleDeclaration): t.TSModuleDeclaration
-  (node: t.TSNamespaceExportDeclaration): t.TSNamespaceExportDeclaration
-  (node: t.TSTypeAliasDeclaration): t.TSTypeAliasDeclaration
-
-  // Declarations
-  (node: t.InterfaceDeclaration): t.InterfaceDeclaration
-  (node: t.TypeAlias): t.TypeAlias
-  (node: t.Declaration): TSType
-
-  // Expressions
-  (node: t.ArrayExpression): t.ArrayExpression
-  (node: t.AssignmentExpression): t.AssignmentExpression
-  (node: t.BinaryExpression): t.BinaryExpression
-  (node: t.CallExpression): t.CallExpression
-  (node: t.ConditionalExpression): t.ConditionalExpression
-  (node: t.FunctionExpression): t.FunctionExpression
-  (node: t.Identifier): t.Identifier
-  (node: t.StringLiteral): t.StringLiteral
-  (node: t.NumericLiteral): t.NumericLiteral
-  (node: t.BooleanLiteral): t.BooleanLiteral
-  (node: t.NullLiteral): t.NullLiteral
-  (node: t.RegExpLiteral): t.RegExpLiteral
-  (node: t.LogicalExpression): t.LogicalExpression
-  (node: t.MemberExpression): t.MemberExpression
-  (node: t.NewExpression): t.NewExpression
-  (node: t.ObjectExpression): t.ObjectExpression
-  (node: t.SequenceExpression): t.SequenceExpression
-  (node: t.ThisExpression): t.ThisExpression
-  (node: t.UnaryExpression): t.UnaryExpression
-  (node: t.UpdateExpression): t.UpdateExpression
-  (node: t.ArrowFunctionExpression): t.ArrowFunctionExpression
-  (node: t.ClassExpression): t.ClassExpression
-  (node: t.MetaProperty): t.MetaProperty
-  (node: t.Super): t.Super
-  (node: t.TaggedTemplateExpression): t.TaggedTemplateExpression
-  (node: t.TemplateLiteral): t.TemplateLiteral
-  (node: t.YieldExpression): t.YieldExpression
-  (node: t.TypeCastExpression): t.TypeCastExpression
-  (node: t.ParenthesizedExpression): t.ParenthesizedExpression
-  (node: t.AwaitExpression): t.AwaitExpression
-  (node: t.BindExpression): t.BindExpression
-  (node: t.DoExpression): t.DoExpression
-  (node: t.TSAsExpression): t.TSAsExpression
-  (node: t.TSNonNullExpression): t.TSNonNullExpression
-  (node: t.TSTypeAssertion): t.TSTypeAssertion
-
-  // Literals
-  (node: t.StringLiteral): t.StringLiteral
-  (node: t.NumericLiteral): t.NumericLiteral
-  (node: t.BooleanLiteral): t.BooleanLiteral
-  (node: t.NullLiteral): t.NullLiteral
-  (node: t.RegExpLiteral): t.RegExpLiteral
-  (node: t.TemplateLiteral): t.TemplateLiteral
-
-  // JSX
-  (node: t.JSXAttribute): t.JSXAttribute
-  (node: t.JSXClosingElement): t.JSXClosingElement
-  (node: t.JSXElement): t.JSXElement
-  (node: t.JSXEmptyExpression): t.JSXEmptyExpression
-  (node: t.JSXExpressionContainer): t.JSXExpressionContainer
-  (node: t.JSXSpreadChild): t.JSXSpreadChild
-  (node: t.JSXIdentifier): t.JSXIdentifier
-  (node: t.JSXMemberExpression): t.JSXMemberExpression
-  (node: t.JSXNamespacedName): t.JSXNamespacedName
-  (node: t.JSXOpeningElement): t.JSXOpeningElement
-  (node: t.JSXSpreadAttribute): t.JSXSpreadAttribute
-  (node: t.JSXText): t.JSXText
-  (node: t.JSXFragment): t.JSXFragment
-  (node: t.JSXOpeningFragment): t.JSXOpeningFragment
-  (node: t.JSXClosingFragment): t.JSXClosingFragment
-
-  // FlowBaseAnnotations
-  (node: t.AnyTypeAnnotation): t.TSAnyKeyword
-  (node: t.ArrayTypeAnnotation): t.TSArrayType
-  (node: t.BooleanTypeAnnotation): t.TSBooleanKeyword
-  (node: t.BooleanLiteralTypeAnnotation): t.TSLiteralType
-  (node: t.FunctionTypeAnnotation): t.TSFunctionType
-  (node: t.GenericTypeAnnotation): t.TSTypeReference
-  (node: t.IntersectionTypeAnnotation): t.TSIntersectionType
-  (node: t.MixedTypeAnnotation): t.TSAnyKeyword
-  (node: t.NullableTypeAnnotation): t.TSUnionType
-  (node: t.NullLiteralTypeAnnotation): t.TSNullKeyword
-  (node: t.NumberLiteralTypeAnnotation): t.TSLiteralType
-  (node: t.NumberTypeAnnotation): t.TSNumberKeyword
-  (node: t.StringLiteralTypeAnnotation): t.TSLiteralType
-  (node: t.StringTypeAnnotation): t.TSStringKeyword
-  (node: t.ThisTypeAnnotation): t.TSThisType
-  (node: t.TupleTypeAnnotation): t.TSTupleType
-  (node: t.TypeofTypeAnnotation): t.TSTypeOperator
-  (node: t.TypeAnnotation): t.TSTypeAnnotation
-  (node: t.ObjectTypeAnnotation): t.TSObjectKeyword
-  (node: t.UnionTypeAnnotation): t.TSUnionType
-  (node: t.VoidTypeAnnotation): t.TSVoidKeyword
-  (node: t.FlowBaseAnnotation): TSType
-
-  // Flow types
-  (node: t.ClassImplements): t.TSExpressionWithTypeArguments
-  (node: t.ClassProperty): t.ClassProperty
-  (node: t.DeclareClass): t.DeclareClass
-  (node: t.DeclareFunction): t.TSDeclareFunction
-  (node: t.DeclareInterface): t.DeclareInterface
-  (node: t.DeclareModule): t.DeclareModule
-  (node: t.DeclareTypeAlias): t.DeclareTypeAlias
-  (node: t.DeclareVariable): t.DeclareVariable
-  (node: t.FunctionTypeParam): t.TSParameterProperty
-  (node: t.InterfaceExtends): t.InterfaceExtends
-  (node: t.InterfaceDeclaration): t.InterfaceDeclaration
-  (node: t.TypeAlias): t.TypeAlias
-  (node: t.TypeCastExpression): t.TSAsExpression
-  (node: t.TypeParameterDeclaration): t.TSTypeParameterDeclaration
-  (node: t.TypeParameterInstantiation): t.TSTypeParameterInstantiation
-  (node: t.ObjectTypeCallProperty): t.ObjectTypeCallProperty // TODO
-  (node: t.ObjectTypeIndexer): t.ObjectTypeIndexer
-  (node: t.ObjectTypeProperty): t.ObjectTypeProperty
-  (node: t.QualifiedTypeIdentifier): t.QualifiedTypeIdentifier
-  (node: t.Flow): t.TSType
-
-  // Other
-  (node: t.File): t.File
-  (node: t.Program): t.Program
-  (node: null): null
-  (node: undefined): undefined
-
-  (node: t.Directive): t.Directive
-  (node: t.VariableDeclarator): t.VariableDeclarator
-
-  (node: t.Expression): t.Expression
-
-  // (node: AnyNode): AnyNonFlowNode
-}
-
-export let ts: TS = (node?: AnyNode | null) => {
-
+export let ts = (node: any) => {
   if (!node) {
-    return node
+    return node;
+  }
+  if (Array.isArray(node)) {
+    return node.map(ts);
+  }
+  if (!node.type) {
+    return node;
+  }
+  const newNode = getNode();
+  if (node.returnType) {
+    newNode.returnType = t.tsTypeAnnotation(ts(node.returnType));
+  } else if (node.typeAnnotation && node.type !== 'TypeCastExpression') {
+    newNode.typeAnnotation = t.tsTypeAnnotation(ts(node.typeAnnotation));
+  }
+  const copyProps = [
+    'leadingComments',
+    'trailingComments',
+    'innerComments',
+    'optional',
+    'async',
+    'generator',
+    'superClass',
+    'superTypeParameters',
+    'mixins',
+    'typeParameters',
+    'typeArguments',
+  ];
+  copyProps.forEach(p => {
+    if (node[p]) {
+      newNode[p] = ts(node[p]);
+    }
+  });
+
+  if (node.implements) {
+    newNode.implements = node.implements;
   }
 
-  switch (node.type) {
+  return newNode;
 
-    case 'File': return t.file(ts(node.program), node.comments, node.tokens)
-    case 'Program': return t.program(map(node.body, _ => ts(_)), node.directives)
+  function getNode() {
+    switch (node.type) {
+      case 'File':
+        return t.file(ts(node.program), node.comments, node.tokens);
+      case 'Program':
+        return t.program(ts(node.body), node.directives);
+      case 'CommentBlock':
+        return node;
+      case 'CommentLine':
+        return node;
+      // Statements
+      case 'OptionalMemberExpression':
+        return convertOptionalMemberExpression(node);
+      case 'VariableDeclaration':
+        return t.variableDeclaration(node.kind, ts(node.declarations));
+      case 'VariableDeclarator':
+        return t.variableDeclarator(ts(node.id), ts(node.init));
+      case 'BlockStatement':
+        return t.blockStatement(ts(node.body), ts(node.directives));
+      case 'DoWhileStatement':
+        return t.doWhileStatement(ts(node.test), ts(node.body));
+      case 'ExpressionStatement':
+        return t.expressionStatement(ts(node.expression));
+      case 'ForInStatement':
+        return t.forInStatement(ts(node.left), ts(node.right), ts(node.body));
+      case 'ForStatement':
+        return t.forStatement(ts(node.init), ts(node.test), ts(node.update), ts(node.body));
+      case 'FunctionDeclaration':
+        return t.functionDeclaration(
+          ts(node.id),
+          ts(node.params),
+          ts(node.body),
+          node.generator,
+          node.async
+        );
+      case 'IfStatement':
+        return t.ifStatement(ts(node.test), ts(node.consequent), ts(node.alternate));
+      case 'LabeledStatement':
+        return t.labeledStatement(ts(node.label), ts(node.body));
+      case 'ReturnStatement':
+        return t.returnStatement(ts(node.argument));
+      case 'SwitchStatement':
+        return t.switchStatement(ts(node.discriminant), ts(node.cases));
+      case 'ThrowStatement':
+        return t.throwStatement(ts(node.argument));
+      case 'TryStatement':
+        return t.tryStatement(ts(node.block), ts(node.handler), ts(node.finalizer));
+      case 'WhileStatement':
+        return t.whileStatement(ts(node.test), ts(node.body));
+      case 'WithStatement':
+        return t.withStatement(ts(node.object), ts(node.body));
+      case 'ClassDeclaration':
+        return t.classDeclaration(
+          ts(node.id),
+          ts(node.superClass),
+          ts(node.body),
+          ts(node.decorators)
+        );
+      case 'ClassExpression':
+        return t.classExpression(
+          ts(node.id),
+          ts(node.superClass),
+          ts(node.body),
+          ts(node.decorators)
+        );
+      case 'ClassProperty':
+        return t.classProperty(
+          ts(node.key),
+          ts(node.value),
+          node.typeAnnotation ? t.tsTypeAnnotation(ts(node.typeAnnotation)) : null,
+          node.decorators,
+          node.computed
+        ); // TODO: static
+      case 'ExportAllDeclaration':
+        return t.exportAllDeclaration(ts(node.source));
+      case 'ExportDefaultDeclaration':
+        return t.exportDefaultDeclaration(ts(node.declaration));
+      case 'ExportNamedDeclaration':
+        return t.exportNamedDeclaration(
+          ts(node.declaration),
+          node.specifiers.map(_ => ts(_)),
+          ts(node.source)
+        );
+      case 'ForOfStatement':
+        return t.forOfStatement(ts(node.left), ts(node.right), ts(node.body));
+      case 'ImportDeclaration':
+        return t.importDeclaration(ts(node.specifiers), ts(node.source));
+      case 'BreakStatement':
+        return t.breakStatement(ts(node.label));
+      case 'ContinueStatement':
+        return t.continueStatement(ts(node.label));
+      case 'TaggedTemplateExpression':
+        return t.taggedTemplateExpression(ts(node.tag), ts(node.quasi));
+      case 'CatchClause':
+        return t.catchClause(ts(node.param), ts(node.body));
+      case 'RestElement':
+        return t.restElement(ts(node.argument));
+      case 'RegExpLiteral':
+        return node;
+      // Flow types
+      case 'ClassImplements':
+        throw new Error('Should not reach this');
+      case 'DeclareClass':
+        return node;
+      case 'DeclareFunction':
+        return node;
+      case 'DeclareInterface':
+        return node; // TODO
+      case 'DeclareModule':
+        return node; // TODO
+      case 'DeclareTypeAlias':
+        return node; // TODO
+      case 'DeclareVariable':
+        return node; // TODO
+      case 'FunctionTypeParam':
+        return node; // TODO
+      case 'InterfaceExtends':
+        return t.tsExpressionWithTypeArguments(ts(node.id), ts(node.typeParameters));
+      case 'InterfaceDeclaration':
+        return getInterfaceDeclaration(node);
+      case 'TypeAlias':
+        return t.tsTypeAliasDeclaration(ts(node.id), ts(node.typeParameters), ts(node.right));
+      case 'TypeCastExpression':
+        return t.tsAsExpression(ts(node.expression), ts(node.typeAnnotation));
+      case 'TypeParameterDeclaration':
+        return t.tsTypeParameterDeclaration(ts(node.params));
+      case 'TypeParameter':
+        return getTypeParameter(ts(node.bound), ts(node.default), node.name);
+      case 'TypeParameterInstantiation':
+        return t.tsTypeParameterInstantiation(ts(node.params));
+      case 'ObjectTypeCallProperty':
+        return ts(node.value);
+      case 'ObjectTypeIndexer':
+        const name = (node.id && node.id.name) || 'key';
+        let type;
+        if (node.key.type === 'GenericTypeAnnotation') {
+          // typescript doesn't support identifiers as type indexers
+          type = t.tsStringKeyword();
+        } else {
+          type = ts(node.key);
+        }
+        const param = t.identifier(name);
+        param.typeAnnotation = t.tsTypeAnnotation(type);
+        return t.tsIndexSignature([param], t.tsTypeAnnotation(ts(node.value)));
+      case 'QualifiedTypeIdentifier':
+        return t.tsQualifiedName(ts(node.qualification), ts(node.id));
+      case 'Variance':
+        return node; // TODO
 
-    // Statements
-    case 'VariableDeclaration': return t.variableDeclaration(node.kind, map(node.declarations, _ => ts(_)))
-    case 'VariableDeclarator': return t.variableDeclarator(ts(node.id), node.init)
-    case 'BlockStatement': return t.blockStatement(map(node.body, _ => ts(_)), map(node.directives, _ => ts(_)))
-    case 'DoWhileStatement': return t.doWhileStatement(ts(node.test), ts(node.body))
-    case 'ExpressionStatement': return t.expressionStatement(ts(node.expression))
-    case 'ForInStatement': return t.forInStatement(ts(node.left), ts(node.right), ts(node.body))
-    case 'ForStatement': return t.forStatement(ts(node.init), ts(node.test), ts(node.update), ts(node.body))
-    case 'FunctionDeclaration': return t.functionDeclaration(ts(node.id), map(node.params, ts), ts(node.body), node.generator, node.async)
-    case 'IfStatement': return t.ifStatement(ts(node.test), ts(node.consequent), ts(node.alternate))
-    case 'LabeledStatement': return t.labeledStatement(ts(node.label))
-    case 'ReturnStatement': return t.returnStatement(ts(node.argument))
-    case 'SwitchStatement': return t.switchStatement(ts(node.discriminant), map(node.cases, ts))
-    case 'ThrowStatement': return t.throwStatement(ts(node.argument))
-    case 'TryStatement': return t.tryStatement(ts(node.block), ts(node.handler), ts(node.finalizer))
-    case 'WhileStatement': return t.whileStatement(ts(node.test), ts(node.body))
-    case 'WithStatement': return t.withStatement(ts(node.object), ts(node.body))
-    case 'ClassDeclaration': return t.classDeclaration(ts(node.id), ts(node.superClass), ts(node.body), map(node.decorators, ts))
-    case 'ClassProperty': return t.classProperty(node.key, node.value, ts(node.typeAnnotation!), node.decorators, node.computed, node.abstract, node.accessibility, node.definite, node.optional, node.readonly) // TODO: static
-    case 'ExportAllDeclaration': return t.exportAllDeclaration(ts(node.source))
-    case 'ExportDefaultDeclaration': return t.exportDefaultDeclaration(ts(node.declaration))
-    case 'ExportNamedDeclaration': return t.exportNamedDeclaration(ts(node.declaration), node.specifiers.map(_ => ts(_)), ts(node.source))
-    case 'ForOfStatement': return t.forOfStatement(ts(node.left), ts(node.right), ts(node.body))
-    case 'ImportDeclaration': return t.importDeclaration(map(node.specifiers, ts), ts(node.source))
-    case 'BreakStatement': return t.breakStatement(ts(node.label))
-    case 'ContinueStatement': return t.continueStatement(ts(node.label))
+      // Flow type annotations
+      case 'AnyTypeAnnotation':
+        return t.tsAnyKeyword();
+      case 'ArrayTypeAnnotation':
+        return t.tsArrayType(ts(node.elementType));
+      case 'BooleanTypeAnnotation':
+        return t.tsBooleanKeyword();
+      case 'BooleanLiteralTypeAnnotation':
+        return t.tsLiteralType(t.booleanLiteral(node.value));
+      case 'FunctionTypeAnnotation':
+        return functionToTsType(node);
+      case 'GenericTypeAnnotation':
+        const id = node.id;
+        if (id.type === 'Identifier') {
+          const name = id.name;
+          if (name === '$Keys') {
+            const op = t.tsTypeOperator(ts(node.typeParameters.params[0]));
+            op.operator = 'keyof';
+            return op;
+          } else if (name === '$Exact') {
+            return ts(node.typeParameters.params[0]);
+          } else if (name === '$ReadOnly') {
+            node.id.name = 'Readonly';
+          } else if (name === '$Values') {
+            const param = ts(node.typeParameters.params[0]);
+            const op = t.tsTypeOperator(param);
+            op.operator = 'keyof';
+            const replacement = t.tsIndexedAccessType(param, op);
+            return replacement;
+          } else if (name === '$Diff') {
+            return t.tsAnyKeyword();
+          }
+        }
+        return t.tsTypeReference(ts(node.id));
+      case 'IntersectionTypeAnnotation':
+        return t.tsIntersectionType(node.types.map(_ => ts(_)));
+      case 'MixedTypeAnnotation':
+        return t.tsAnyKeyword();
+      case 'NullLiteralTypeAnnotation':
+        return t.tsNullKeyword();
+      case 'NullableTypeAnnotation':
+        return t.tsUnionType([ts(node.typeAnnotation), t.tsNullKeyword(), t.tsUndefinedKeyword()]);
+      case 'NumberLiteralTypeAnnotation':
+        return t.tsLiteralType(t.numericLiteral(node.value));
+      case 'NumberTypeAnnotation':
+        return t.tsNumberKeyword();
+      case 'StringLiteralTypeAnnotation':
+        return t.tsLiteralType(t.stringLiteral(node.value));
+      case 'StringTypeAnnotation':
+        return t.tsStringKeyword();
+      case 'ThisTypeAnnotation':
+        return t.tsThisType();
+      case 'TupleTypeAnnotation':
+        return t.tsTupleType(node.types.map(_ => ts(_)));
+      case 'TypeofTypeAnnotation':
+        return t.tsTypeQuery(ts(node.argument.id));
+      case 'TypeAnnotation':
+        return ts(node.typeAnnotation);
+      case 'ObjectTypeAnnotation':
+        return t.tsTypeLiteral([
+          ...node.properties.map(_ => {
+            let s = t.tsPropertySignature(_.key, t.tsTypeAnnotation(ts(_.value)));
+            s.optional = _.optional;
+            return s;
+            // TODO: variance
+          }),
+          ...ts(node.indexers),
+          ...ts(node.callProperties),
+        ]);
+      case 'UnionTypeAnnotation':
+        return t.tsUnionType(ts(node.types));
+      case 'VoidTypeAnnotation':
+        return t.tsVoidKeyword();
 
-    case 'DebuggerStatement':
-    case 'EmptyStatement':
-      return node
+      case 'ObjectTypeProperty':
+        let _ = t.tsPropertySignature(node.key, t.tsTypeAnnotation(ts(node.value)));
+        _.optional = node.optional;
+        _.readonly = node.variance && node.variance.kind === 'minus';
+        return _;
+      case 'NewExpression':
+        return t.newExpression(ts(node.callee), ts(node.arguments));
+      case 'CallExpression':
+        return t.callExpression(ts(node.callee), ts(node.arguments));
+      case 'ArrowFunctionExpression':
+        return t.arrowFunctionExpression(ts(node.params), ts(node.body), node.async);
+      case 'ClassBody':
+        return t.classBody(ts(node.body));
+      case 'Identifier':
+        return t.identifier(node.name);
+      case 'StringLiteral':
+        return node;
+      case 'ImportSpecifier':
+        return t.importSpecifier(node.local, node.imported);
+      case 'ImportDefaultSpecifier':
+        return node;
+      case 'ImportNamespaceSpecifier':
+        return node;
+      case 'NullLiteral':
+        return node;
+      case 'BooleanLiteral':
+        return node;
+      case 'ThisExpression':
+        return node;
+      case 'MemberExpression':
+        return t.memberExpression(ts(node.object), ts(node.property), node.computed, node.optional);
+      case 'ObjectProperty':
+        return t.objectProperty(
+          ts(node.key),
+          ts(node.value),
+          node.computed,
+          node.shorthand,
+          ts(node.decorators)
+        );
+      case 'ClassMethod':
+        return t.classMethod(
+          node.kind,
+          node.key,
+          ts(node.params),
+          ts(node.body),
+          node.computed,
+          node.static
+        );
+      case 'LogicalExpression':
+        return t.logicalExpression(node.operator, ts(node.left), ts(node.right));
+      case 'ConditionalExpression':
+        return t.conditionalExpression(ts(node.test), ts(node.consequent), ts(node.alternate));
+      case 'AssignmentExpression':
+        return t.assignmentExpression(node.operator, ts(node.left), ts(node.right));
+      case 'UnaryExpression':
+        return t.unaryExpression(node.operator, ts(node.argument), node.prefix);
+      case 'ObjectPattern':
+        return t.objectPattern(ts(node.properties));
+      case 'ObjectExpression':
+        return t.objectExpression(ts(node.properties));
+      case 'AwaitExpression':
+        return t.awaitExpression(ts(node.argument));
+      case 'JSXElement':
+        return t.jsxElement(
+          ts(node.openingElement),
+          ts(node.closingElement),
+          ts(node.children),
+          node.selfClosing
+        );
+      case 'JSXOpeningElement':
+        return t.jsxOpeningElement(ts(node.name), ts(node.attributes), node.selfClosing);
+      case 'JSXClosingElement':
+        return t.jsxClosingElement(ts(node.name));
+      case 'JSXFragment':
+        return t.jsxFragment(ts(node.openingFragment), ts(node.closingFragment), ts(node.children));
+      case 'JSXOpeningFragment':
+        return node;
+      case 'JSXClosingFragment':
+        return node;
+      case 'SpreadElement':
+        return t.spreadElement(ts(node.argument));
+      case 'NumericLiteral':
+        return node;
+      case 'ObjectMethod':
+        return t.objectMethod(node.kind, node.key, ts(node.params), ts(node.body), node.computed);
+      case 'BinaryExpression':
+        return t.binaryExpression(node.operator, ts(node.left), ts(node.right));
+      case 'ArrayExpression':
+        return t.arrayExpression(ts(node.elements));
+      case 'Super':
+        return node;
+      case 'TemplateLiteral':
+        return t.templateLiteral(ts(node.quasis), ts(node.expressions));
+      case 'TemplateElement':
+        return node;
+      case 'YieldExpression':
+        return t.yieldExpression(ts(node.argument), node.delegate);
+      case 'ForOfStatement':
+        return t.forOfStatement(ts(node.left), ts(node.right), ts(node.body));
+      case 'ArrayPattern':
+        return t.arrayPattern(ts(node.elements));
+      case 'AssignmentPattern':
+        return t.assignmentPattern(ts(node.left), ts(node.right));
+      case 'JSXAttribute':
+        return t.jsxAttribute(ts(node.name), ts(node.value));
+      case 'JSXExpressionContainer':
+        return t.jsxExpressionContainer(ts(node.expression));
+      case 'JSXText':
+        return node;
+      case 'JSXIdentifier':
+        return node;
+      case 'JSXSpreadAttribute':
+        return t.jsxSpreadAttribute(ts(node.argument));
+      case 'FunctionExpression':
+        return t.functionExpression(
+          ts(node.id),
+          ts(node.params),
+          ts(node.body),
+          node.generator,
+          node.async
+        );
+      case 'UpdateExpression':
+        return t.updateExpression(node.operator, ts(node.argument), node.prefix);
+      case 'SwitchCase':
+        return t.switchCase(ts(node.test), ts(node.consequent));
+      case 'ExportSpecifier':
+        return node;
+      case 'OpaqueType':
+        return t.tsTypeAliasDeclaration(ts(node.id), ts(node.typeParameters), ts(node.impltype));
+      case 'ExistsTypeAnnotation':
+        return t.tsAnyKeyword();
 
-    // Flow types
-    case 'ClassImplements': return node // TODO
-    case 'DeclareClass':
-      let cd = t.classDeclaration(ts(node.id), ts(node.extends), ts(node.body))
-      cd.declare = true
-      return cd
-    case 'DeclareFunction':
-      let fd = t.functionDeclaration(ts(node.id), node)
-      if (node.id.typeAnnotation && t.isFunctionTypeAnnotation(node.id.typeAnnotation)) {
-        fd.params = node.id.typeAnnotation.params.map(_ => ts(_))
-        fd.returnType = ts(node.id.typeAnnotation.returnType)
-        fd.typeParameters = ts(node.id.typeAnnotation.typeParameters)
-      }
-      return fd
-    case 'DeclareInterface': return node // TODO
-    case 'DeclareModule': return node // TODO
-    case 'DeclareTypeAlias': return node // TODO
-    case 'DeclareVariable': return node // TODO
-    case 'FunctionTypeParam': return node // TODO
-    case 'InterfaceExtends': return node // TODO
-    case 'InterfaceDeclaration': return node // TODO
-    case 'TypeAlias': return node // TODO
-    case 'TypeCastExpression': return node // TODO
-    case 'TypeParameterDeclaration': return node // TODO
-    case 'TypeParameterInstantiation': return node // TODO
-    case 'ObjectTypeCallProperty': return node // TODO
-    case 'ObjectTypeIndexer': return node // TODO
-    case 'ObjectTypeProperty': return node // TODO
-    case 'QualifiedTypeIdentifier': return node // TODO
-    case 'Variance': return node // TODO
-
-    // JSX
-    case 'JSXAttribute':
-    case 'JSXClosingElement':
-    case 'JSXElement':
-    case 'JSXEmptyExpression':
-    case 'JSXExpressionContainer':
-    case 'JSXSpreadChild':
-    case 'JSXIdentifier':
-    case 'JSXMemberExpression':
-    case 'JSXNamespacedName':
-    case 'JSXOpeningElement':
-    case 'JSXSpreadAttribute':
-    case 'JSXText':
-    case 'JSXFragment':
-    case 'JSXOpeningFragment':
-    case 'JSXClosingFragment':
-      return node
-
-    // Flow type annotations
-    case 'AnyTypeAnnotation': return tsAnyKeyword()
-    case 'ArrayTypeAnnotation': return tsArrayType(ts(node.elementType))
-    case 'BooleanTypeAnnotation': return tsBooleanKeyword()
-    case 'BooleanLiteralTypeAnnotation': return tsLiteralType(booleanLiteral(node.value))
-    case 'FunctionTypeAnnotation': return functionToTsType(node)
-    case 'GenericTypeAnnotation': return tsTypeReference(node.id)
-    case 'IntersectionTypeAnnotation': return tsIntersectionType(node.types.map(_ => ts(_)))
-    case 'MixedTypeAnnotation': return tsAnyKeyword()
-    case 'NullLiteralTypeAnnotation': return tsNullKeyword()
-    case 'NullableTypeAnnotation': return tsUnionType([ts(node.typeAnnotation), tsNullKeyword(), tsUndefinedKeyword()])
-    case 'NumberLiteralTypeAnnotation': return tsLiteralType(numericLiteral(node.value))
-    case 'NumberTypeAnnotation': return tsNumberKeyword()
-    case 'StringLiteralTypeAnnotation': return tsLiteralType(stringLiteral(node.value))
-    case 'StringTypeAnnotation': return tsStringKeyword()
-    case 'ThisTypeAnnotation': return tsThisType()
-    case 'TupleTypeAnnotation': return tsTupleType(node.types.map(_ => ts(_)))
-    case 'TypeofTypeAnnotation': return tsTypeQuery(getId(node.argument))
-    case 'TypeAnnotation': return ts(node.typeAnnotation)
-    case 'ObjectTypeAnnotation': return tsTypeLiteral([
-      ...node.properties.map(_ => {
-      let s = tsPropertySignature(_.key, tsTypeAnnotation(ts(_.value)))
-      s.optional = _.optional
-      return s
-      // TODO: anonymous indexers
-      // TODO: named indexers
-      // TODO: call properties
-      // TODO: variance
-      })
-      // ...node.indexers.map(_ => tsIndexSignature())
-    ])
-    case 'UnionTypeAnnotation': return tsUnionType(map(node.types, _ => ts(_)))
-    case 'VoidTypeAnnotation': return tsVoidKeyword()
-
-    case 'ObjectTypeProperty':
-      let _ = tsPropertySignature(node.key, tsTypeAnnotation(ts(node.value)))
-      _.optional = node.optional
-      _.readonly = node.variance && node.variance.kind === 'minus'
-      return _
-
-    case 'TypeCastExpression':
-      return tsAsExpression(node.expression, ts(node.typeAnnotation))
-
-    case 'TypeParameterDeclaration':
-      let params = node.params.map(_ => {
-        let d = (_ as any as TypeParameter).default
-        let p = tsTypeParameter(
-          hasBound(_) ? ts(_.bound.typeAnnotation) : undefined,
-          d ? ts(d) : undefined
-        )
-        p.name = _.name
-        return p
-      })
-
-      return tsTypeParameterDeclaration(params)
-
-    // TS types
-    // TODO: Why does tsTs get called with TSTypes? It should only get called with Flow types.
-    case 'TSAnyKeyword':
-    case 'TSArrayType':
-    case 'TSBooleanKeyword':
-    case 'TSConstructorType':
-    case 'TSExpressionWithTypeArguments':
-    case 'TSFunctionType':
-    case 'TSIndexedAccessType':
-    case 'TSIntersectionType':
-    case 'TSLiteralType':
-    case 'TSMappedType':
-    case 'TSNeverKeyword':
-    case 'TSNullKeyword':
-    case 'TSNumberKeyword':
-    case 'TSObjectKeyword':
-    case 'TSParenthesizedType':
-    case 'TSStringKeyword':
-    case 'TSSymbolKeyword':
-    case 'TSThisType':
-    case 'TSTupleType':
-    case 'TSTypeLiteral':
-    case 'TSTypeOperator':
-    case 'TSTypePredicate':
-    case 'TSTypeQuery':
-    case 'TSTypeReference':
-    case 'TSUndefinedKeyword':
-    case 'TSUnionType':
-    case 'TSVoidKeyword':
-    case 'TSAsExpression':
-      return node
-
-    case 'TSDeclareFunction':
-    case 'TSEnumDeclaration':
-    case 'TSExportAssignment':
-    case 'TSImportEqualsDeclaration':
-    case 'TSInterfaceDeclaration':
-    case 'TSModuleDeclaration':
-    case 'TSNamespaceExportDeclaration':
-    case 'TSTypeAliasDeclaration':
-      return node
+      default:
+        console.log('hit default', node.type);
+        return node;
+    }
   }
+};
+
+function getInterfaceDeclaration(node: t.InterfaceDeclaration) {
+  return t.tsInterfaceDeclaration(
+    ts(node.id),
+    ts(node.typeParameters),
+    node.extends.length ? ts(node.extends) : null,
+    t.tsInterfaceBody(ts(node.body.properties))
+  );
 }
 
-type F<T, U> = (a: T, i: number, arr: T[]) => U
-
-function map<T, U>(a: null, f: F<T, U>): null
-function map<T, U>(a: undefined, f: F<T, U>): undefined
-function map<T, U>(a: T[], f: F<T, U>): U[]
-function map<T, U>(a: T[] | null | undefined, f: F<T, U>): U[] | null | undefined {
-  if (!a) {
-    return a
-  }
-  return a.map(f)
-}
-
-function getId(node: t.FlowType): Identifier {
-  switch (node.type) {
-    case 'GenericTypeAnnotation': return node.id
-    default: throw ReferenceError('typeof query must reference a node that has an id')
-  }
-}
-
-function functionToTsType(node: FunctionTypeAnnotation): TSFunctionType {
-
-  let typeParams = undefined
+function functionToTsType(node: t.FunctionTypeAnnotation): t.TSFunctionType {
+  let typeParams = undefined;
 
   if (node.typeParameters) {
-    typeParams = tsTypeParameterDeclaration(node.typeParameters.params.map(_ => {
+    typeParams = t.tsTypeParameterDeclaration(
+      node.typeParameters.params.map(_ => {
+        // TODO: How is this possible?
+        if (t.isTSTypeParameter(_)) {
+          return _;
+        }
 
-      // TODO: How is this possible?
-      if (isTSTypeParameter(_)) {
-        return _
-      }
-
-      let constraint = _.bound ? ts(_.bound) : undefined
-      let default_ = _.default ? ts(_.default) : undefined
-      let param = tsTypeParameter(constraint, default_)
-      param.name = _.name
-      return param
-    }))
+        let constraint = _.bound ? ts(_.bound) : undefined;
+        let default_ = _.default ? ts(_.default) : undefined;
+        let param = t.tsTypeParameter(constraint, default_);
+        param.name = _.name;
+        return param;
+      })
+    );
   }
 
-  let f = tsFunctionType(typeParams)
+  let f = t.tsFunctionType(typeParams);
 
   // Params
   if (node.params) {
     // TODO: Rest params
-    let paramNames = node.params.map(_ => _.name).filter(_ => _ !== null).map(_ => (_ as Identifier).name)
+    let paramNames = node.params
+      .map(_ => _.name)
+      .filter(_ => _ !== null)
+      .map(_ => (_ as t.Identifier).name);
     f.parameters = node.params.map(_ => {
-      let name = _.name && _.name.name
+      let name = _.name && _.name.name;
 
       // Generate param name? (Required in TS, optional in Flow)
       if (name == null) {
-        name = generateFreeIdentifier(paramNames)
-        paramNames.push(name)
+        name = generateFreeIdentifier(paramNames);
+        paramNames.push(name);
       }
-
-      let id = identifier(name)
-
+      let id = t.identifier(name);
       if (_.typeAnnotation) {
-        id.typeAnnotation = tsTypeAnnotation(ts(_.typeAnnotation))
+        id.typeAnnotation = t.tsTypeAnnotation(ts(_.typeAnnotation));
       }
-
-      return id
-    })
+      id.optional = _.optional;
+      return id;
+    });
   }
 
   // Return type
   if (node.returnType) {
-    f.typeAnnotation = tsTypeAnnotation(ts(node.returnType))
+    f.typeAnnotation = t.tsTypeAnnotation(ts(node.returnType));
   }
 
-  return f
+  return f;
 }
 
-function hasBound(node: Node): node is BoundedTypeParameter {
-  return isTypeParameter(node) && node.bound != null
+function removeOptional(node) {
+  if (node.type === 'OptionalMemberExpression') {
+    const expr = t.memberExpression(
+      removeOptional(node.object) as t.Expression,
+      node.property,
+      node.computed,
+      node.optional
+    );
+    return expr;
+  }
+  return node;
 }
 
-interface BoundedTypeParameter extends TypeParameter {
-  bound: TypeAnnotation
+function convertOptionalMemberExpression(node) {
+  let current = node;
+  let q = [];
+  while (current) {
+    if (current.type === 'OptionalMemberExpression') {
+      q.push(removeOptional(current));
+      current = current.object;
+    } else {
+      current = null;
+    }
+  }
+  let expr = null;
+  while (q.length) {
+    const expression = q.pop();
+    if (!expr) {
+      expr = t.logicalExpression('&&', expression.object, expression);
+    } else {
+      expr = t.logicalExpression('&&', expr, expression);
+    }
+  }
+
+  return expr;
+}
+
+function getTypeParameter(bound, d, name) {
+  const param = t.tsTypeParameter(bound, d);
+  param.name = name;
+  return param;
 }

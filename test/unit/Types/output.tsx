@@ -1,0 +1,16 @@
+type A = void;
+type B = null;
+type C = boolean;
+type D = number;
+type E = string;
+type F = string | null | undefined;
+type G = {
+  a: number;
+};
+type H = {
+  a: number;
+  b: string | null | undefined;
+};
+type I = {
+  a: <T extends number, U>(b: T, c: U | number) => T;
+};

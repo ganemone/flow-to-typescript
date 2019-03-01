@@ -7,16 +7,20 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": true,
+    "noImplicitAny": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "outDir": "dist",
     "preserveConstEnums": false,
     "sourceMap": true,
-    "strict": true,
+    "strict": false,
     "target": "es2015"
   },
   "exclude": [
-    "**/*.js.flow"
+    "**/*.js.flow",
+    "test/**/"
+  ],
+  "include": [
+    "src/"
   ]
 }
